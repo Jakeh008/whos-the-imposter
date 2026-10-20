@@ -120,7 +120,7 @@
                     Proceed to Voting
                 </button>
             </div>
-            <div id="waiting-voting-controls" class="text-center text-xs text-gray-500 italic py-2">
+            <div id="waiting-discussion-controls" class="text-center text-xs text-gray-500 italic py-2">
                 Awaiting host to open voting...
             </div>
         </div>
@@ -140,7 +140,7 @@
         <div id="screen-scores" class="hidden space-y-6">
             <div class="text-center">
                 <h2 class="text-lg font-bold text-emerald-400 uppercase tracking-wider">Round Results</h2>
-                <p id="imposter-reveal" class="text-xs text-red-400 font-bold mt-1 uppercase"></p>
+                <p id="imposter-reveal" class="text-xs font-bold mt-1 uppercase"></p>
             </div>
 
             <ul id="scoreboard-list" class="space-y-2"></ul>
@@ -152,7 +152,7 @@
 
             <div id="host-next-round-controls" class="hidden">
                 <button onclick="triggerNextRound()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-black font-bold py-3 rounded-lg transition tracking-wide uppercase text-sm">
-                    Proceed to Next Case
+                    Proceed to Next Case (First to 21)
                 </button>
             </div>
         </div>
@@ -164,6 +164,7 @@
         let currentRoom = '';
         let isHost = false;
         let responseInterval = null;
+        let activePlayersCache = [];
 
         function showError(msg) {
             const banner = document.getElementById('error-banner');
@@ -228,7 +229,6 @@
         function castVote(votedId) {
             socket.emit('submit_vote', { roomCode: currentRoom, votedId });
             document.getElementById('voted-status').classList.remove('hidden');
-            // Disable buttons
             const buttons = document.querySelectorAll('#voting-list button');
             buttons.forEach(b => b.disabled = true);
         }
@@ -260,6 +260,7 @@
         });
 
         function updatePlayerList(players) {
+            activePlayersCache = players;
             document.getElementById('player-count').innerText = players.length;
             const list = document.getElementById('player-list');
             list.innerHTML = players.map(p => `
@@ -293,6 +294,7 @@
 
         socket.on('show_discussion', ({ innocentPrompt, players }) => {
             clearInterval(responseInterval);
+            activePlayersCache = players;
             document.getElementById('discussion-prompt').innerText = `Standard Question: "${innocentPrompt}"`;
             
             const container = document.getElementById('discussion-answers');
@@ -305,38 +307,42 @@
 
             if (isHost) {
                 document.getElementById('host-discussion-controls').classList.remove('hidden');
-                document.getElementById('waiting-discussion-controls')?.classList.add('hidden');
+                document.getElementById('waiting-discussion-controls').classList.add('hidden');
+            } else {
+                document.getElementById('host-discussion-controls').classList.add('hidden');
+                document.getElementById('waiting-discussion-controls').classList.remove('hidden');
             }
             showScreen('screen-discussion');
         });
 
         socket.on('start_voting', () => {
             document.getElementById('voted-status').classList.add('hidden');
-            // Request latest player list from DOM or maintain state
-            const playerItems = document.querySelectorAll('#player-list li');
-            // Alternatively, build voting list dynamically from saved state if needed, or query socket list
-            showScreen('screen-voting');
-        });
-
-        // We handle populating the voting list when moving to voting phase via an event update or rendering players
-        socket.on('show_discussion', ({ players }) => {
             const votingList = document.getElementById('voting-list');
-            votingList.innerHTML = players.map(p => `
+            votingList.innerHTML = activePlayersCache.map(p => `
                 <button onclick="castVote('${p.id}')" class="w-full bg-gray-900 hover:bg-emerald-600 hover:text-black border border-gray-800 text-gray-200 p-3 rounded-lg text-sm font-bold transition flex justify-between items-center">
                     <span>${p.name}</span>
                     <span class="text-xs uppercase opacity-75">Accuse</span>
                 </button>
             `).join('');
+            showScreen('screen-voting');
         });
 
-        socket.on('round_results', ({ players, imposterId, gameOver, champion }) => {
+        socket.on('round_results', ({ players, imposterId, imposterCaught, gameOver, champion }) => {
             const imposter = players.find(p => p.id === imposterId);
-            document.getElementById('imposter-reveal').innerText = `Imposter Was: ${imposter ? imposter.name : 'Unknown'}`;
+            const revealText = document.getElementById('imposter-reveal');
+            
+            if (imposterCaught) {
+                revealText.innerText = `Imposter Was Caught: ${imposter ? imposter.name : 'Unknown'}! (Detectives scored points)`;
+                revealText.className = 'text-xs font-bold mt-1 uppercase text-emerald-400';
+            } else {
+                revealText.innerText = `Imposter Survived: ${imposter ? imposter.name : 'Unknown'}! (Imposter scored 3 points)`;
+                revealText.className = 'text-xs font-bold mt-1 uppercase text-red-400';
+            }
 
             const list = document.getElementById('scoreboard-list');
             list.innerHTML = players.map(p => `
                 <li class="bg-gray-900 border border-gray-800 px-4 py-3 rounded-lg flex justify-between items-center text-sm">
-                    <span class="text-gray-200 font-bold">${p.name}</span>
+                    <span class="text-gray-200 font-bold">${p.name} ${p.id === imposterId ? '<span class="text-xs text-red-400 font-normal">(Imposter)</span>' : ''}</span>
                     <span class="text-emerald-400 font-bold">${p.score} pts</span>
                 </li>
             `).join('');

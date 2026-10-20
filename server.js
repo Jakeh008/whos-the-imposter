@@ -170,12 +170,11 @@ function startNewRound(roomCode) {
     const imposterIndex = Math.floor(Math.random() * room.players.length);
     room.imposterId = room.players[imposterIndex].id;
 
-    room.players.forEach((player, index) => {
+    room.players.forEach((player) => {
         const promptText = (player.id === room.imposterId) ? pair.imposter : pair.innocent;
         io.to(player.id).emit('game_started', { prompt: promptText });
     });
 
-    // 67 second timer for response phase
     room.timer = setTimeout(() => {
         startDiscussionPhase(roomCode);
     }, 67000);
@@ -195,20 +194,30 @@ function processResults(roomCode) {
     const room = rooms[roomCode];
     if (!room) return;
 
+    // Count votes for the imposter
+    const votesForImposter = room.players.filter(p => p.vote === room.imposterId).length;
+    const totalPlayers = room.players.length;
+    const imposterCaught = votesForImposter >= (totalPlayers / 2);
+
+    // Score evaluation based on user requirements from Gemini Conversations
+    room.players.forEach(p => {
+        if (p.id !== room.imposterId) {
+            // Innocent Detectives: 1 point for each correct vote identifying the imposter
+            if (p.vote === room.imposterId) {
+                p.score += 1;
+            }
+        } else {
+            // Imposter: 3 points if they successfully survive with fewer than 50% voting for them, 0 points otherwise
+            if (!imposterCaught) {
+                p.score += 3;
+            }
+        }
+    });
+
     let gameOver = false;
     let champion = null;
 
     room.players.forEach(p => {
-        if (p.vote === room.imposterId) {
-            p.score += 5; // Points for catching imposter
-        }
-        if (p.id === room.imposterId) {
-            // Check if imposter survived (fewer than half voted for them)
-            const votesForImposter = room.players.filter(pl => pl.vote === room.imposterId).length;
-            if (votesForImposter < room.players.length / 2) {
-                p.score += 5; // Points for surviving
-            }
-        }
         if (p.score >= 21) {
             gameOver = true;
             champion = p;
@@ -218,6 +227,7 @@ function processResults(roomCode) {
     io.to(roomCode).emit('round_results', {
         players: room.players,
         imposterId: room.imposterId,
+        imposterCaught,
         gameOver,
         champion
     });

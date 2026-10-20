@@ -82,7 +82,6 @@ io.on('connection', (socket) => {
             return socket.emit('error_message', 'Room not found or game already started.');
         }
 
-        // Prevent duplicate icons
         if (room.players.some(p => p.icon === icon)) {
             return socket.emit('error_message', 'That icon is already chosen by another detective.');
         }
@@ -141,6 +140,11 @@ io.on('connection', (socket) => {
         const player = room.players.find(p => p.id === socket.id);
         if (player) {
             player.vote = votedId;
+
+            io.to(roomCode).emit('update_vote_status', room.players.map(p => ({
+                id: p.id,
+                hasVoted: p.vote !== null && p.vote !== undefined
+            })));
 
             if (room.players.every(p => p.vote !== undefined && p.vote !== null)) {
                 processResults(roomCode);

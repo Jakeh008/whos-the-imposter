@@ -190,58 +190,28 @@
         let myCurrentVote = null;
 
         const icons = {
-            "magnifying-glass": {
-                name: "Magnifying Glass",
-                svg: `<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>`
-            },
-            "question-mark": {
-                name: "Question Mark",
-                svg: `<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line><circle cx="12" cy="12" r="10"></circle></svg>`
-            },
-            "silhouette": {
-                name: "Masquerade Mask",
-                svg: `<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M2 12s3-6 10-6 10 6 10 6-3 6-10 6-10-6-10-6z"></path><path d="M8 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0z"></path><path d="M12 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0z"></path></svg>`
-            },
-            "envelope": {
-                name: "Wrapped Envelope",
-                svg: `<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>`
-            },
-            "fingerprint": {
-                name: "Partial Fingerprint",
-                svg: `<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0-10 10v4"></path><path d="M12 6a6 6 0 0 0-6 6v6"></path><path d="M12 10a2 2 0 0 0-2 2v4"></path><path d="M16 8a8 8 0 0 1 4 8v2"></path></svg>`
-            },
-            "key": {
-                name: "Master Key",
-                svg: `<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>`
-            },
-            "hourglass": {
-                name: "Hourglass",
-                svg: `<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M5 22h14"></path><path d="M5 2h14"></path><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"></path><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"></path></svg>`
-            },
-            "lamp": {
-                name: "Interrogation Lamp",
-                svg: `<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M6 3h12l4 6H2l4-6z"></path><path d="M12 9v6"></path><path d="M9 15h6"></path><path d="M12 15v6"></path></svg>`
-            },
-            "footprints": {
-                name: "Footprint",
-                svg: `<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M4 16c0-2.21 1.79-4 4-4s4 1.79 4 4-1.79 4-4 4-4-1.79-4-4z"></path><path d="M13 8c0-1.66 1.34-3 3-3s3 1.34 3 3-1.34 3-3 3-3-1.34-3-3 z"></path><path d="M15 2c0-1.1.9-2 2-2s2 .9 2 2-.9 2-2 2-2-.9-2-2z"></path></svg>`
-            },
-            "owl": {
-                name: "Detective Owl",
-                svg: `<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 2l3 5h4l-3 4 1 5-4-2-4 2 1-5-3-4h4z"></path><circle cx="9" cy="10" r="2"></circle><circle cx="15" cy="10" r="2"></circle></svg>`
-            }
+            "magnifying-glass": "🔎",
+            "question-mark": "❓",
+            "mask": "🎭",
+            "envelope": "✉️",
+            "fingerprint": "🗂️",
+            "key": "🔑",
+            "hourglass": "⏳",
+            "lamp": "💡",
+            "footprint": "👣",
+            "owl": "🦉"
         };
 
         function renderIconGrid(takenIcons = []) {
             const grid = document.getElementById('icon-grid');
             grid.innerHTML = Object.keys(icons).map(key => {
-                const iconData = icons[key];
+                const iconSymbol = icons[key];
                 const isTaken = takenIcons.includes(key);
                 const isSelected = selectedIconId === key;
                 return `
-                    <button type="button" title="${iconData.name}" onclick="${isTaken ? '' : `selectIcon('${key}')`}" 
-                        class="p-3 rounded-lg border flex items-center justify-center transition ${isTaken ? 'bg-gray-950 border-gray-900 text-gray-700 cursor-not-allowed opacity-40' : isSelected ? 'bg-emerald-950 border-emerald-500 text-emerald-400 shadow-md' : 'bg-gray-900 border-gray-800 text-gray-300 hover:border-gray-600'}">
-                        ${iconData.svg}
+                    <button type="button" onclick="${isTaken ? '' : `selectIcon('${key}')`}" 
+                        class="p-3 rounded-lg border text-xl flex items-center justify-center transition ${isTaken ? 'bg-gray-950 border-gray-900 text-gray-700 cursor-not-allowed opacity-40' : isSelected ? 'bg-emerald-950 border-emerald-500 shadow-md' : 'bg-gray-900 border-gray-800 hover:border-gray-600'}">
+                        ${iconSymbol}
                     </button>
                 `;
             }).join('');
@@ -319,7 +289,7 @@
                 return `
                     <button onclick="castVote('${p.id}')" class="w-full border p-3 rounded-lg text-sm font-bold transition flex justify-between items-center ${isMyChoice ? 'bg-emerald-950 border-emerald-500 text-emerald-300' : 'bg-gray-900 hover:bg-emerald-900/40 border-gray-800 text-gray-200'}">
                         <span class="flex items-center gap-2">
-                            <span class="w-5 h-5 flex items-center justify-center">${icons[p.icon] ? icons[p.icon].svg : ''}</span>
+                            <span class="text-lg">${icons[p.icon] || ''}</span>
                             ${p.name}
                         </span>
                         <span class="text-xs uppercase opacity-75">${isMyChoice ? 'Your Accusation (Click to Change)' : 'Accuse'}</span>
@@ -364,7 +334,7 @@
             list.innerHTML = players.map(p => `
                 <li class="bg-gray-900 border border-gray-800 px-4 py-2.5 rounded-lg flex justify-between items-center text-sm">
                     <span class="text-gray-200 flex items-center gap-2">
-                        <span class="text-emerald-400 w-5 h-5 flex items-center justify-center">${icons[p.icon] ? icons[p.icon].svg : ''}</span>
+                        <span class="text-lg">${icons[p.icon] || ''}</span>
                         ${p.name}
                     </span>
                     <span class="text-xs text-gray-500">${p.score || 0} pts</span>
@@ -404,7 +374,7 @@
             container.innerHTML = players.map(p => `
                 <div class="bg-gray-900 border border-gray-800 p-3 rounded-lg">
                     <span class="text-xs font-bold text-emerald-400 flex items-center gap-2 mb-1">
-                        <span class="w-4 h-4 flex items-center justify-center">${icons[p.icon] ? icons[p.icon].svg : ''}</span>
+                        <span class="text-base">${icons[p.icon] || ''}</span>
                         ${p.name}
                     </span>
                     <p class="text-sm text-gray-200">${p.answer}</p>
@@ -455,10 +425,10 @@
             const revealText = document.getElementById('imposter-reveal');
             
             if (imposterCaught) {
-                revealText.innerHTML = `Imposter Caught: <span class="inline-flex items-center gap-1">${icons[imposter.icon] ? icons[imposter.icon].svg : ''}</span> ${imposter.name}!`;
+                revealText.innerHTML = `Imposter Caught: <span class="text-base">${icons[imposter.icon] || ''}</span> ${imposter.name}!`;
                 revealText.className = 'text-xs font-bold mt-1 uppercase text-emerald-400 flex items-center justify-center gap-1';
             } else {
-                revealText.innerHTML = `Imposter Survived: <span class="inline-flex items-center gap-1">${icons[imposter.icon] ? icons[imposter.icon].svg : ''}</span> ${imposter.name}!`;
+                revealText.innerHTML = `Imposter Survived: <span class="text-base">${icons[imposter.icon] || ''}</span> ${imposter.name}!`;
                 revealText.className = 'text-xs font-bold mt-1 uppercase text-red-400 flex items-center justify-center gap-1';
             }
 
@@ -466,13 +436,13 @@
             breakdownContainer.innerHTML = players.map(suspect => {
                 const voters = players.filter(p => p.vote === suspect.id);
                 const voterIconsHtml = voters.length > 0 
-                    ? voters.map(v => `<span class="bg-gray-800 text-emerald-400 border border-gray-700 p-1.5 rounded inline-flex items-center justify-center w-7 h-7" title="${v.name}">${icons[v.icon] ? icons[v.icon].svg : ''}</span>`).join('')
+                    ? voters.map(v => `<span class="bg-gray-800 text-emerald-400 border border-gray-700 p-1 rounded inline-flex items-center justify-center text-base w-7 h-7" title="${v.name}">${icons[v.icon] || ''}</span>`).join('')
                     : '<span class="text-gray-600 text-xs italic">No votes</span>';
 
                 return `
                     <div class="bg-gray-900 border border-gray-800 p-2.5 rounded-lg flex justify-between items-center text-sm">
                         <span class="text-gray-300 flex items-center gap-2">
-                            <span class="text-emerald-400 w-5 h-5 flex items-center justify-center">${icons[suspect.icon] ? icons[suspect.icon].svg : ''}</span>
+                            <span class="text-base">${icons[suspect.icon] || ''}</span>
                             ${suspect.name}
                         </span>
                         <div class="flex flex-wrap gap-1">${voterIconsHtml}</div>
@@ -484,7 +454,7 @@
             list.innerHTML = players.map(p => `
                 <li class="bg-gray-900 border border-gray-800 px-4 py-3 rounded-lg flex justify-between items-center text-sm">
                     <span class="text-gray-200 font-bold flex items-center gap-2">
-                        <span class="text-emerald-400 w-5 h-5 flex items-center justify-center">${icons[p.icon] ? icons[p.icon].svg : ''}</span>
+                        <span class="text-base">${icons[p.icon] || ''}</span>
                         ${p.name} ${p.id === imposterId ? '<span class="text-xs text-red-400 font-normal">(Imposter)</span>' : ''}
                     </span>
                     <span class="text-emerald-400 font-bold">${p.score} pts</span>
@@ -492,7 +462,7 @@
             `).join('');
 
             if (gameOver && champion) {
-                document.getElementById('champion-name').innerHTML = `<span class="inline-flex items-center gap-1">${icons[champion.icon] ? icons[champion.icon].svg : ''}</span> ${champion.name} Wins the Game!`;
+                document.getElementById('champion-name').innerHTML = `<span class="text-lg">${icons[champion.icon] || ''}</span> ${champion.name} Wins the Game!`;
                 document.getElementById('winner-announcement').classList.remove('hidden');
                 document.getElementById('host-next-round-controls').classList.add('hidden');
             } else {

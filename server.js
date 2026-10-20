@@ -68,7 +68,8 @@ io.on('connection', (socket) => {
         rooms[roomCode] = {
             host: socket.id,
             players: [{ id: socket.id, name: playerName, score: 0 }],
-            gameState: 'lobby'
+            gameState: 'lobby',
+            timer: null
         };
         socket.join(roomCode);
         socket.emit('room_joined', { roomCode, players: rooms[roomCode].players, isHost: true });
@@ -103,28 +104,31 @@ io.on('connection', (socket) => {
             io.to(roomCode).emit('player_answered', player.id);
 
             if (room.players.every(p => p.answer)) {
-                io.to(roomCode).emit('show_answers', room.players);
+                clearTimeout(room.timer);
+                startDiscussionPhase(roomCode);
             }
         }
     });
 
-    socket.on('award_points', ({ roomCode, winnerId }) => {
+    socket.on('start_voting_phase', (roomCode) => {
         const room = rooms[roomCode];
         if (!room || room.host !== socket.id) return;
+        clearTimeout(room.timer);
+        room.players.forEach(p => p.vote = null);
+        io.to(roomCode).emit('start_voting');
+    });
 
-        const winner = room.players.find(p => p.id === winnerId);
-        let gameOver = false;
-        let champion = null;
+    socket.on('submit_vote', ({ roomCode, votedId }) => {
+        const room = rooms[roomCode];
+        if (!room) return;
+        const player = room.players.find(p => p.id === socket.id);
+        if (player) {
+            player.vote = votedId;
 
-        if (winner) {
-            winner.score += 5;
-            if (winner.score >= 21) {
-                gameOver = true;
-                champion = winner;
+            if (room.players.every(p => p.vote !== undefined && p.vote !== null)) {
+                processResults(roomCode);
             }
         }
-
-        io.to(roomCode).emit('round_results', { players: room.players, gameOver, champion });
     });
 
     socket.on('next_round', (roomCode) => {
@@ -139,6 +143,7 @@ io.on('connection', (socket) => {
             const room = rooms[roomCode];
             room.players = room.players.filter(p => p.id !== socket.id);
             if (room.players.length === 0) {
+                clearTimeout(room.timer);
                 delete rooms[roomCode];
             } else {
                 if (room.host === socket.id) {
@@ -155,15 +160,66 @@ function startNewRound(roomCode) {
     const room = rooms[roomCode];
     if (!room) return;
 
-    room.players.forEach(p => p.answer = null);
+    room.players.forEach(p => {
+        p.answer = null;
+        p.vote = null;
+    });
 
     const pair = promptPairs[Math.floor(Math.random() * promptPairs.length)];
+    room.currentInnocentPrompt = pair.innocent;
     const imposterIndex = Math.floor(Math.random() * room.players.length);
+    room.imposterId = room.players[imposterIndex].id;
 
     room.players.forEach((player, index) => {
-        const role = (index === imposterIndex) ? 'imposter' : 'innocent';
-        const promptText = (role === 'imposter') ? pair.imposter : pair.innocent;
-        io.to(player.id).emit('game_started', { prompt: promptText, role });
+        const promptText = (player.id === room.imposterId) ? pair.imposter : pair.innocent;
+        io.to(player.id).emit('game_started', { prompt: promptText });
+    });
+
+    // 67 second timer for response phase
+    room.timer = setTimeout(() => {
+        startDiscussionPhase(roomCode);
+    }, 67000);
+}
+
+function startDiscussionPhase(roomCode) {
+    const room = rooms[roomCode];
+    if (!room) return;
+
+    io.to(roomCode).emit('show_discussion', {
+        innocentPrompt: room.currentInnocentPrompt,
+        players: room.players.map(p => ({ id: p.id, name: p.name, answer: p.answer || 'No response' }))
+    });
+}
+
+function processResults(roomCode) {
+    const room = rooms[roomCode];
+    if (!room) return;
+
+    let gameOver = false;
+    let champion = null;
+
+    room.players.forEach(p => {
+        if (p.vote === room.imposterId) {
+            p.score += 5; // Points for catching imposter
+        }
+        if (p.id === room.imposterId) {
+            // Check if imposter survived (fewer than half voted for them)
+            const votesForImposter = room.players.filter(pl => pl.vote === room.imposterId).length;
+            if (votesForImposter < room.players.length / 2) {
+                p.score += 5; // Points for surviving
+            }
+        }
+        if (p.score >= 21) {
+            gameOver = true;
+            champion = p;
+        }
+    });
+
+    io.to(roomCode).emit('round_results', {
+        players: room.players,
+        imposterId: room.imposterId,
+        gameOver,
+        champion
     });
 }
 

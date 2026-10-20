@@ -81,11 +81,16 @@
             </div>
         </div>
 
-        <!-- SCREEN: GAMEPLAY (WRITING PHASE) -->
+        <!-- SCREEN: GAMEPLAY (RESPONSE PHASE) -->
         <div id="screen-game" class="hidden space-y-6">
+            <div class="flex justify-between items-center bg-gray-900 border border-gray-800 px-3 py-2 rounded-lg text-xs">
+                <span class="text-gray-400 uppercase">Response Time</span>
+                <span id="timer-display" class="text-emerald-400 font-bold">67s</span>
+            </div>
+
             <div class="bg-gray-900/80 border border-gray-800 p-4 rounded-lg text-center">
-                <span id="role-badge" class="inline-block px-3 py-1 rounded text-xs font-bold uppercase tracking-widest mb-2"></span>
-                <p id="prompt-text" class="text-lg font-medium text-emerald-300 mt-2"></p>
+                <p class="text-xs uppercase text-gray-400 mb-1">Your Confidential Prompt</p>
+                <p id="prompt-text" class="text-lg font-medium text-emerald-300 mt-1"></p>
             </div>
 
             <div class="space-y-3">
@@ -98,26 +103,44 @@
             <p id="waiting-status" class="text-center text-xs text-gray-500 hidden">Evidence logged. Awaiting remaining investigators...</p>
         </div>
 
-        <!-- SCREEN: REVEAL / VOTING -->
-        <div id="screen-reveal" class="hidden space-y-6">
+        <!-- SCREEN: DISCUSSION PHASE -->
+        <div id="screen-discussion" class="hidden space-y-6">
             <div class="text-center">
-                <h2 class="text-lg font-bold text-emerald-400 uppercase tracking-wider">Evidence Logged</h2>
-                <p class="text-xs text-gray-400 mt-1">Review statements and award points to the correct detective.</p>
+                <h2 class="text-lg font-bold text-emerald-400 uppercase tracking-wider">Discussion Phase</h2>
+                <p id="discussion-prompt" class="text-xs text-gray-300 mt-1 italic"></p>
             </div>
 
-            <div id="answers-container" class="space-y-3 max-h-60 overflow-y-auto pr-1"></div>
+            <div id="discussion-answers" class="space-y-3 max-h-60 overflow-y-auto pr-1"></div>
 
-            <div id="host-reveal-controls" class="hidden">
-                <button onclick="triggerNextRound()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-black font-bold py-3 rounded-lg transition tracking-wide uppercase text-sm">
-                    View Standings / Next Case
+            <div id="host-discussion-controls" class="hidden space-y-2">
+                <button onclick="triggerVotingTimer()" id="timer-30-btn" class="w-full bg-gray-800 hover:bg-gray-700 text-emerald-400 border border-gray-700 font-bold py-2.5 rounded-lg transition text-xs uppercase tracking-wide">
+                    Start 30s Discussion Timer
                 </button>
+                <button onclick="startVotingPhase()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-black font-bold py-3 rounded-lg transition tracking-wide uppercase text-sm">
+                    Proceed to Voting
+                </button>
+            </div>
+            <div id="waiting-voting-controls" class="text-center text-xs text-gray-500 italic py-2">
+                Awaiting host to open voting...
             </div>
         </div>
 
-        <!-- SCREEN: SCOREBOARD / ROUND OVER -->
+        <!-- SCREEN: VOTING PHASE -->
+        <div id="screen-voting" class="hidden space-y-6">
+            <div class="text-center">
+                <h2 class="text-lg font-bold text-emerald-400 uppercase tracking-wider">Unmask The Imposter</h2>
+                <p class="text-xs text-gray-400 mt-1">Select who you believe received a different prompt.</p>
+            </div>
+
+            <div id="voting-list" class="space-y-2 max-h-60 overflow-y-auto pr-1"></div>
+            <p id="voted-status" class="text-center text-xs text-emerald-400 hidden">Vote cast. Awaiting other investigators...</p>
+        </div>
+
+        <!-- SCREEN: SCOREBOARD / RESULTS -->
         <div id="screen-scores" class="hidden space-y-6">
             <div class="text-center">
-                <h2 class="text-lg font-bold text-emerald-400 uppercase tracking-wider">Case Standings (First to 21)</h2>
+                <h2 class="text-lg font-bold text-emerald-400 uppercase tracking-wider">Round Results</h2>
+                <p id="imposter-reveal" class="text-xs text-red-400 font-bold mt-1 uppercase"></p>
             </div>
 
             <ul id="scoreboard-list" class="space-y-2"></ul>
@@ -140,6 +163,7 @@
         const socket = io();
         let currentRoom = '';
         let isHost = false;
+        let responseInterval = null;
 
         function showError(msg) {
             const banner = document.getElementById('error-banner');
@@ -149,7 +173,7 @@
         }
 
         function showScreen(screenId) {
-            ['screen-home', 'screen-lobby', 'screen-game', 'screen-reveal', 'screen-scores'].forEach(id => {
+            ['screen-home', 'screen-lobby', 'screen-game', 'screen-discussion', 'screen-voting', 'screen-scores'].forEach(id => {
                 document.getElementById(id).classList.add('hidden');
             });
             document.getElementById(screenId).classList.remove('hidden');
@@ -182,8 +206,31 @@
             document.getElementById('waiting-status').classList.remove('hidden');
         }
 
-        function awardPoints(winnerId) {
-            socket.emit('award_points', { roomCode: currentRoom, winnerId });
+        function startVotingPhase() {
+            socket.emit('start_voting_phase', currentRoom);
+        }
+
+        function triggerVotingTimer() {
+            let seconds = 30;
+            const btn = document.getElementById('timer-30-btn');
+            btn.disabled = true;
+            btn.innerText = `Discussion Timer: ${seconds}s`;
+            const interval = setInterval(() => {
+                seconds--;
+                btn.innerText = `Discussion Timer: ${seconds}s`;
+                if (seconds <= 0) {
+                    clearInterval(interval);
+                    btn.innerText = "Timer Ended";
+                }
+            }, 1000);
+        }
+
+        function castVote(votedId) {
+            socket.emit('submit_vote', { roomCode: currentRoom, votedId });
+            document.getElementById('voted-status').classList.remove('hidden');
+            // Disable buttons
+            const buttons = document.querySelectorAll('#voting-list button');
+            buttons.forEach(b => b.disabled = true);
         }
 
         function triggerNextRound() {
@@ -223,48 +270,69 @@
             `).join('');
         }
 
-        socket.on('game_started', ({ prompt, role }) => {
+        socket.on('game_started', ({ prompt }) => {
             document.getElementById('answer-input').value = '';
             document.getElementById('submit-btn').disabled = false;
             document.getElementById('submit-btn').classList.remove('opacity-50', 'cursor-not-allowed');
             document.getElementById('waiting-status').classList.add('hidden');
-
-            const badge = document.getElementById('role-badge');
-            if (role === 'imposter') {
-                badge.innerText = 'CLASSIFIED: YOU ARE THE IMPOSTER';
-                badge.className = 'inline-block px-3 py-1 rounded text-xs font-bold uppercase tracking-widest mb-2 bg-red-950 text-red-400 border border-red-800';
-            } else {
-                badge.innerText = 'CLEARANCE: INNOCENT INVESTIGATOR';
-                badge.className = 'inline-block px-3 py-1 rounded text-xs font-bold uppercase tracking-widest mb-2 bg-emerald-950 text-emerald-400 border border-emerald-800';
-            }
-
             document.getElementById('prompt-text').innerText = prompt;
+
+            let timeLeft = 67;
+            document.getElementById('timer-display').innerText = `${timeLeft}s`;
+            clearInterval(responseInterval);
+            responseInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer-display').innerText = `${timeLeft}s`;
+                if (timeLeft <= 0) {
+                    clearInterval(responseInterval);
+                }
+            }, 1000);
+
             showScreen('screen-game');
         });
 
-        socket.on('show_answers', (players) => {
-            const container = document.getElementById('answers-container');
+        socket.on('show_discussion', ({ innocentPrompt, players }) => {
+            clearInterval(responseInterval);
+            document.getElementById('discussion-prompt').innerText = `Standard Question: "${innocentPrompt}"`;
+            
+            const container = document.getElementById('discussion-answers');
             container.innerHTML = players.map(p => `
                 <div class="bg-gray-900 border border-gray-800 p-3 rounded-lg">
-                    <div class="flex justify-between items-center mb-1">
-                        <span class="text-xs font-bold text-emerald-400">${p.name}</span>
-                        ${isHost ? `<button onclick="awardPoints('${p.id}')" class="text-xs bg-gray-800 hover:bg-emerald-600 hover:text-black text-gray-300 px-2 py-0.5 rounded transition">Award Points</button>` : ''}
-                    </div>
-                    <p class="text-sm text-gray-200">${p.answer || 'No response'}</p>
+                    <span class="text-xs font-bold text-emerald-400 block mb-1">${p.name}</span>
+                    <p class="text-sm text-gray-200">${p.answer}</p>
                 </div>
             `).join('');
 
-            const revealControls = document.getElementById('host-reveal-controls');
             if (isHost) {
-                revealControls.classList.remove('hidden');
-            } else {
-                revealControls.classList.add('hidden');
+                document.getElementById('host-discussion-controls').classList.remove('hidden');
+                document.getElementById('waiting-discussion-controls')?.classList.add('hidden');
             }
-
-            showScreen('screen-reveal');
+            showScreen('screen-discussion');
         });
 
-        socket.on('round_results', ({ players, gameOver, champion }) => {
+        socket.on('start_voting', () => {
+            document.getElementById('voted-status').classList.add('hidden');
+            // Request latest player list from DOM or maintain state
+            const playerItems = document.querySelectorAll('#player-list li');
+            // Alternatively, build voting list dynamically from saved state if needed, or query socket list
+            showScreen('screen-voting');
+        });
+
+        // We handle populating the voting list when moving to voting phase via an event update or rendering players
+        socket.on('show_discussion', ({ players }) => {
+            const votingList = document.getElementById('voting-list');
+            votingList.innerHTML = players.map(p => `
+                <button onclick="castVote('${p.id}')" class="w-full bg-gray-900 hover:bg-emerald-600 hover:text-black border border-gray-800 text-gray-200 p-3 rounded-lg text-sm font-bold transition flex justify-between items-center">
+                    <span>${p.name}</span>
+                    <span class="text-xs uppercase opacity-75">Accuse</span>
+                </button>
+            `).join('');
+        });
+
+        socket.on('round_results', ({ players, imposterId, gameOver, champion }) => {
+            const imposter = players.find(p => p.id === imposterId);
+            document.getElementById('imposter-reveal').innerText = `Imposter Was: ${imposter ? imposter.name : 'Unknown'}`;
+
             const list = document.getElementById('scoreboard-list');
             list.innerHTML = players.map(p => `
                 <li class="bg-gray-900 border border-gray-800 px-4 py-3 rounded-lg flex justify-between items-center text-sm">

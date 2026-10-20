@@ -6,175 +6,130 @@
     <title>Who's The Imposter?</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/socket.io/socket.io.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: 'Nunito', sans-serif;
-            background-color: #2b1d0c;
-            background-image: radial-gradient(circle, #3d2912 0%, #1a1107 100%);
-            color: #f3e9dc;
+            background-color: #0b0f19;
+            color: #e2e8f0;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
         }
-        .storybook-title {
-            font-family: 'MedievalSharp', cursive;
-        }
-        .parchment {
-            background-color: #f4ebd0;
-            color: #2c1810;
-            border: 4px solid #8c6239;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        .case-file {
+            background: #111827;
+            border: 1px solid #374151;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7);
         }
     </style>
 </head>
-<body class="min-h-screen flex flex-col items-center justify-center p-4">
+<body class="min-h-screen flex items-center justify-center p-4">
 
-    <div id="app" class="w-full max-w-xl mx-auto">
+    <div class="w-full max-w-md case-file rounded-xl p-6 border border-gray-800">
         
-        <!-- Welcome Screen -->
-        <div id="screen-welcome" class="parchment p-8 rounded-2xl text-center relative">
-            <div class="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-[#8c6239] text-[#f4ebd0] px-6 py-2 rounded-full font-bold uppercase tracking-wider text-sm border-2 border-[#f4ebd0]">
-                Mystery Library Edition
+        <!-- HEADER -->
+        <div class="text-center mb-6">
+            <h1 class="text-2xl font-bold tracking-wider text-emerald-400">WHO'S THE IMPOSTER</h1>
+            <p class="text-xs text-gray-400 mt-1 uppercase tracking-widest">Classified Investigation Unit</p>
+        </div>
+
+        <!-- ERROR MESSAGE -->
+        <div id="error-banner" class="hidden bg-red-950/50 border border-red-800 text-red-200 text-sm p-3 rounded-lg mb-4 text-center"></div>
+
+        <!-- SCREEN: HOME / JOIN -->
+        <div id="screen-home" class="space-y-4">
+            <div>
+                <label class="block text-xs uppercase text-gray-400 mb-1">Detective Name</label>
+                <input type="text" id="player-name" placeholder="Enter your alias..." maxlength="15" 
+                    class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500">
             </div>
-            
-            <h1 class="storybook-title text-4xl md:text-5xl text-[#5c3a21] mt-4 mb-2">Who's The Imposter?</h1>
-            <p class="text-[#6b4f3b] mb-6 font-semibold">A cozy game of clever answers and hidden deception.</p>
 
-            <div class="space-y-4 max-w-sm mx-auto">
-                <div>
-                    <label class="block text-left text-xs font-bold uppercase text-[#5c3a21] mb-1">Your Detective Name</label>
-                    <input type="text" id="input-username" placeholder="e.g. Detective Paws" maxlength="15" 
-                        class="w-full px-4 py-3 rounded-xl border-2 border-[#8c6239] bg-white text-[#2c1810] font-bold focus:outline-none focus:ring-2 focus:ring-[#5c3a21]">
-                </div>
+            <button onclick="createRoom()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-black font-bold py-3 rounded-lg transition tracking-wide uppercase text-sm">
+                Host New Case
+            </button>
 
-                <div>
-                    <label class="block text-left text-xs font-bold uppercase text-[#5c3a21] mb-1">Choose Your Animal Avatar</label>
-                    <div class="grid grid-cols-3 gap-2" id="avatar-selector">
-                        <button type="button" data-avatar="🦉" class="avatar-btn p-3 text-3xl bg-white border-2 border-[#8c6239] rounded-xl hover:bg-[#faebd7] transition">🦉</button>
-                        <button type="button" data-avatar="🦁" class="avatar-btn p-3 text-3xl bg-white border-2 border-[#8c6239] rounded-xl hover:bg-[#faebd7] transition">🦁</button>
-                        <button type="button" data-avatar="🐵" class="avatar-btn p-3 text-3xl bg-white border-2 border-[#8c6239] rounded-xl hover:bg-[#faebd7] transition">🐵</button>
-                        <button type="button" data-avatar="🐘" class="avatar-btn p-3 text-3xl bg-white border-2 border-[#8c6239] rounded-xl hover:bg-[#faebd7] transition">🐘</button>
-                        <button type="button" data-avatar="🦒" class="avatar-btn p-3 text-3xl bg-white border-2 border-[#8c6239] rounded-xl hover:bg-[#faebd7] transition">🦒</button>
-                        <button type="button" data-avatar="🦆" class="avatar-btn p-3 text-3xl bg-white border-2 border-[#8c6239] rounded-xl hover:bg-[#faebd7] transition">🦆</button>
-                    </div>
-                </div>
+            <div class="relative flex py-2 items-center">
+                <div class="flex-grow border-t border-gray-800"></div>
+                <span class="flex-shrink mx-4 text-gray-600 text-xs uppercase">Or Join</span>
+                <div class="flex-grow border-t border-gray-800"></div>
+            </div>
 
-                <div class="pt-4 flex flex-col gap-3">
-                    <button id="btn-create-room" class="w-full py-3 bg-[#5c3a21] text-[#f4ebd0] font-bold rounded-xl shadow-lg hover:bg-[#432a18] transition text-lg">
-                        Host New Case
-                    </button>
-                    <div class="flex gap-2">
-                        <input type="text" id="input-room-code" placeholder="ROOM CODE" maxlength="6" 
-                            class="w-1/2 px-4 py-3 rounded-xl border-2 border-[#8c6239] bg-white text-[#2c1810] font-bold uppercase tracking-widest text-center focus:outline-none">
-                        <button id="btn-join-room" class="w-1/2 py-3 bg-[#8c6239] text-[#f4ebd0] font-bold rounded-xl shadow-lg hover:bg-[#6b4f3b] transition text-lg">
-                            Join Case
-                        </button>
-                    </div>
-                </div>
+            <div class="space-y-3">
+                <input type="text" id="room-code-input" placeholder="CASE CODE (e.g. AB12)" maxlength="4" 
+                    class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-center uppercase tracking-widest text-white focus:outline-none focus:border-emerald-500">
+                <button onclick="joinRoom()" class="w-full bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold py-3 rounded-lg transition tracking-wide uppercase text-sm border border-gray-700">
+                    Join Active Case
+                </button>
             </div>
         </div>
 
-        <!-- Lobby Screen -->
-        <div id="screen-lobby" class="parchment p-8 rounded-2xl text-center hidden relative">
-            <h2 class="storybook-title text-3xl text-[#5c3a21] mb-2">The Investigation Room</h2>
-            <p class="text-sm text-[#6b4f3b] mb-4">Share this code with your fellow detectives (3-10 players):</p>
-            
-            <div class="inline-block bg-white border-4 border-dashed border-[#8c6239] px-6 py-2 rounded-2xl mb-6">
-                <span id="display-room-code" class="text-3xl font-black tracking-widest text-[#5c3a21]">----</span>
+        <!-- SCREEN: LOBBY -->
+        <div id="screen-lobby" class="hidden space-y-6">
+            <div class="text-center bg-gray-900/50 border border-gray-800 p-4 rounded-lg">
+                <p class="text-xs text-gray-400 uppercase tracking-widest">Case Access Code</p>
+                <h2 id="display-room-code" class="text-3xl font-black text-emerald-400 tracking-widest mt-1">----</h2>
             </div>
 
-            <div class="mb-6">
-                <h3 class="text-xs font-bold uppercase text-[#5c3a21] mb-3">Detectives Assembled Around Table</h3>
-                <div id="players-list" class="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 bg-[#e6dbbb] rounded-xl border-2 border-[#8c6239]"></div>
+            <div>
+                <h3 class="text-xs uppercase text-gray-400 mb-3 tracking-wider">Active Detectives (<span id="player-count">0</span>)</h3>
+                <ul id="player-list" class="space-y-2 max-h-40 overflow-y-auto pr-1"></ul>
             </div>
 
             <div id="host-controls" class="hidden">
-                <button id="btn-start-game" class="w-full py-3 bg-[#2d5a27] text-white font-bold rounded-xl shadow-lg hover:bg-[#1e3c1a] transition text-lg">
-                    Start Investigation
+                <button onclick="startGame()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-black font-bold py-3 rounded-lg transition tracking-wide uppercase text-sm">
+                    Open Case Files (Start)
                 </button>
             </div>
-            <div id="guest-waiting" class="text-[#6b4f3b] font-bold italic animate-pulse">
-                Waiting for the Head Detective to open the case...
+            <div id="waiting-controls" class="text-center text-xs text-gray-500 italic py-2">
+                Awaiting lead investigator to open the case...
             </div>
         </div>
 
-        <!-- Writing Phase Screen -->
-        <div id="screen-writing" class="parchment p-8 rounded-2xl hidden relative">
-            <div class="flex justify-between items-center mb-4">
-                <span class="bg-[#8c6239] text-[#f4ebd0] px-3 py-1 rounded-lg text-xs font-bold uppercase">Phase 1: Secret Dossier</span>
-                <div class="text-xl font-black text-[#8b0000] bg-white px-3 py-1 rounded-xl border-2 border-[#8c6239]">
-                    ⏱️ <span id="timer-writing">60</span>s
-                </div>
+        <!-- SCREEN: GAMEPLAY (WRITING PHASE) -->
+        <div id="screen-game" class="hidden space-y-6">
+            <div class="bg-gray-900/80 border border-gray-800 p-4 rounded-lg text-center">
+                <span id="role-badge" class="inline-block px-3 py-1 rounded text-xs font-bold uppercase tracking-widest mb-2"></span>
+                <p id="prompt-text" class="text-lg font-medium text-emerald-300 mt-2"></p>
             </div>
 
-            <div class="bg-white p-4 rounded-xl border-2 border-[#8c6239] mb-4 text-center">
-                <p class="text-xs font-bold uppercase text-[#8c6239] mb-1">Your Secret Prompt:</p>
-                <h3 id="assigned-prompt" class="text-lg font-bold text-[#2c1810]">Loading prompt...</h3>
-            </div>
-
-            <div class="mb-4">
-                <label class="block text-xs font-bold uppercase text-[#5c3a21] mb-1">Write your whiteboard answer:</label>
-                <input type="text" id="input-answer" placeholder="Type your clever answer..." maxlength="40"
-                    class="w-full px-4 py-3 rounded-xl border-2 border-[#8c6239] bg-white text-[#2c1810] font-bold focus:outline-none">
-            </div>
-
-            <button id="btn-submit-answer" class="w-full py-3 bg-[#5c3a21] text-[#f4ebd0] font-bold rounded-xl shadow-lg hover:bg-[#432a18] transition text-lg">
-                Submit to Whiteboard
-            </button>
-            <div id="writing-status" class="text-center mt-3 text-xs font-bold text-[#6b4f3b]"></div>
-        </div>
-
-        <!-- Debate Phase Screen -->
-        <div id="screen-debate" class="parchment p-8 rounded-2xl hidden relative">
-            <div class="flex justify-between items-center mb-4">
-                <span class="bg-[#8c6239] text-[#f4ebd0] px-3 py-1 rounded-lg text-xs font-bold uppercase">Phase 2: The Table Debate</span>
-                <div id="debate-timer-box" class="hidden text-xl font-black text-[#8b0000] bg-white px-3 py-1 rounded-xl border-2 border-[#8c6239]">
-                    ⏱️ <span id="timer-debate">30</span>s
-                </div>
-            </div>
-
-            <div class="bg-white p-4 rounded-xl border-2 border-[#8c6239] mb-4 text-center">
-                <p class="text-xs font-bold uppercase text-[#8c6239] mb-1">The Real Prompt Was:</p>
-                <h3 id="display-real-prompt" class="text-lg font-bold text-[#2c1810]">...</h3>
-            </div>
-
-            <h3 class="text-xs font-bold uppercase text-[#5c3a21] mb-2">Whiteboard Answers Around the Table:</h3>
-            <div id="answers-container" class="space-y-2 max-h-56 overflow-y-auto mb-6 p-2 bg-[#e6dbbb] rounded-xl border-2 border-[#8c6239]"></div>
-
-            <div id="debate-host-controls" class="hidden">
-                <button id="btn-trigger-timer" class="w-full py-2 bg-[#8b0000] text-white font-bold rounded-xl shadow hover:bg-[#600000] transition mb-2">
-                    Trigger 30s Final Warning Timer
+            <div class="space-y-3">
+                <textarea id="answer-input" rows="3" placeholder="Enter your confidential response..." 
+                    class="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-emerald-500 resize-none"></textarea>
+                <button onclick="submitAnswer()" id="submit-btn" class="w-full bg-emerald-600 hover:bg-emerald-500 text-black font-bold py-3 rounded-lg transition tracking-wide uppercase text-sm">
+                    Submit Evidence
                 </button>
             </div>
-            <button id="btn-proceed-voting" class="w-full py-3 bg-[#5c3a21] text-[#f4ebd0] font-bold rounded-xl shadow-lg hover:bg-[#432a18] transition text-lg">
-                Proceed to Voting
-            </button>
+            <p id="waiting-status" class="text-center text-xs text-gray-500 hidden">Evidence logged. Awaiting remaining investigators...</p>
         </div>
 
-        <!-- Voting Phase Screen -->
-        <div id="screen-voting" class="parchment p-8 rounded-2xl hidden relative">
-            <h2 class="storybook-title text-2xl text-[#5c3a21] mb-2 text-center">Accusation Time</h2>
-            <p class="text-xs font-bold uppercase text-[#6b4f3b] mb-4 text-center">Tap the player you suspect received the mismatched question!</p>
-            <div id="voting-grid" class="grid grid-cols-2 gap-3 mb-6 max-h-64 overflow-y-auto p-2 bg-[#e6dbbb] rounded-xl border-2 border-[#8c6239]"></div>
-            <div id="voting-status" class="text-center font-bold text-[#5c3a21]"></div>
+        <!-- SCREEN: REVEAL / VOTING -->
+        <div id="screen-reveal" class="hidden space-y-6">
+            <div class="text-center">
+                <h2 class="text-lg font-bold text-emerald-400 uppercase tracking-wider">Evidence Logged</h2>
+                <p class="text-xs text-gray-400 mt-1">Review statements and award points to the correct detective.</p>
+            </div>
+
+            <div id="answers-container" class="space-y-3 max-h-60 overflow-y-auto pr-1"></div>
+
+            <div id="host-reveal-controls" class="hidden">
+                <button onclick="triggerNextRound()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-black font-bold py-3 rounded-lg transition tracking-wide uppercase text-sm">
+                    View Standings / Next Case
+                </button>
+            </div>
         </div>
 
-        <!-- Results Screen -->
-        <div id="screen-results" class="parchment p-8 rounded-2xl hidden relative text-center">
-            <h2 id="result-headline" class="storybook-title text-3xl mb-2 text-[#5c3a21]">Case Closed!</h2>
-            <p id="result-subtext" class="text-sm font-bold text-[#6b4f3b] mb-4">...</p>
-
-            <div class="bg-white p-4 rounded-xl border-2 border-[#8c6239] mb-6">
-                <p class="text-xs font-bold uppercase text-[#8c6239] mb-1">The Imposter Was:</p>
-                <div id="reveal-imposter" class="text-xl font-black text-[#8b0000]">...</div>
+        <!-- SCREEN: SCOREBOARD / ROUND OVER -->
+        <div id="screen-scores" class="hidden space-y-6">
+            <div class="text-center">
+                <h2 class="text-lg font-bold text-emerald-400 uppercase tracking-wider">Case Standings (First to 21)</h2>
             </div>
 
-            <div class="mb-6">
-                <h3 class="text-xs font-bold uppercase text-[#5c3a21] mb-2">Detective Leaderboard</h3>
-                <div id="leaderboard-list" class="space-y-2 max-h-40 overflow-y-auto p-2 bg-[#e6dbbb] rounded-xl border-2 border-[#8c6239]"></div>
+            <ul id="scoreboard-list" class="space-y-2"></ul>
+
+            <div id="winner-announcement" class="hidden text-center bg-emerald-950/40 border border-emerald-800 p-4 rounded-lg">
+                <h3 id="champion-name" class="text-xl font-bold text-emerald-300"></h3>
+                <p class="text-xs text-emerald-400 uppercase tracking-widest mt-1">Case Closed - Champion Crowned</p>
             </div>
 
-            <div id="results-host-controls" class="hidden">
-                <button id="btn-next-round" class="w-full py-3 bg-[#2d5a27] text-white font-bold rounded-xl shadow-lg hover:bg-[#1e3c1a] transition text-lg">
-                    Turn the Page (Next Round)
+            <div id="host-next-round-controls" class="hidden">
+                <button onclick="triggerNextRound()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-black font-bold py-3 rounded-lg transition tracking-wide uppercase text-sm">
+                    Proceed to Next Case
                 </button>
             </div>
         </div>
@@ -183,212 +138,158 @@
 
     <script>
         const socket = io();
-
-        let selectedAvatar = '🦉';
-        let myUsername = '';
-        let roomCode = '';
+        let currentRoom = '';
         let isHost = false;
-        let playersData = [];
 
-        // Avatar selector logic
-        const avatarButtons = document.querySelectorAll('.avatar-btn');
-        avatarButtons.forEach(btn => {
-            btn.onclick = () => {
-                avatarButtons.forEach(b => {
-                    b.style.backgroundColor = 'white';
-                    b.style.borderColor = '#8c6239';
-                });
-                btn.style.backgroundColor = '#faebd7';
-                btn.style.borderColor = '#5c3a21';
-                selectedAvatar = btn.getAttribute('data-avatar');
-            };
-        });
-        if (avatarButtons.length > 0) {
-            avatarButtons[0].style.backgroundColor = '#faebd7';
-            avatarButtons[0].style.borderColor = '#5c3a21';
-            selectedAvatar = avatarButtons[0].getAttribute('data-avatar');
+        function showError(msg) {
+            const banner = document.getElementById('error-banner');
+            banner.innerText = msg;
+            banner.classList.remove('hidden');
+            setTimeout(() => banner.classList.add('hidden'), 4000);
         }
 
-        function switchScreen(screenId) {
-            ['screen-welcome', 'screen-lobby', 'screen-writing', 'screen-debate', 'screen-voting', 'screen-results'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.classList.add('hidden');
+        function showScreen(screenId) {
+            ['screen-home', 'screen-lobby', 'screen-game', 'screen-reveal', 'screen-scores'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
             });
-            const target = document.getElementById(screenId);
-            if (target) target.classList.remove('hidden');
+            document.getElementById(screenId).classList.remove('hidden');
         }
 
-        // Host Game
-        const createBtn = document.getElementById('btn-create-room');
-        if (createBtn) {
-            createBtn.addEventListener('click', () => {
-                myUsername = document.getElementById('input-username').value.trim();
-                if (!myUsername) { alert('Please enter your detective name!'); return; }
-                isHost = true;
-                socket.emit('createRoom', { username: myUsername, avatar: selectedAvatar });
-            });
+        function createRoom() {
+            const playerName = document.getElementById('player-name').value.trim();
+            if (!playerName) return showError('Please enter your detective name.');
+            socket.emit('create_room', { playerName });
         }
 
-        // Join Game
-        const joinBtn = document.getElementById('btn-join-room');
-        if (joinBtn) {
-            joinBtn.addEventListener('click', () => {
-                myUsername = document.getElementById('input-username').value.trim();
-                roomCode = document.getElementById('input-room-code').value.trim().toUpperCase();
-                if (!myUsername || !roomCode) { alert('Please enter your name and a room code!'); return; }
-                isHost = false;
-                socket.emit('joinRoom', { roomCode, username: myUsername, avatar: selectedAvatar });
-            });
+        function joinRoom() {
+            const playerName = document.getElementById('player-name').value.trim();
+            const roomCode = document.getElementById('room-code-input').value.trim().toUpperCase();
+            if (!playerName) return showError('Please enter your detective name.');
+            if (!roomCode || roomCode.length !== 4) return showError('Please enter a valid 4-character case code.');
+            socket.emit('join_room', { roomCode, playerName });
         }
 
-        socket.on('roomJoined', (data) => {
-            roomCode = data.roomCode;
+        function startGame() {
+            socket.emit('start_game', currentRoom);
+        }
+
+        function submitAnswer() {
+            const answer = document.getElementById('answer-input').value.trim();
+            if (!answer) return showError('Please enter a response.');
+            socket.emit('submit_answer', { roomCode: currentRoom, answer });
+            document.getElementById('submit-btn').disabled = true;
+            document.getElementById('submit-btn').classList.add('opacity-50', 'cursor-not-allowed');
+            document.getElementById('waiting-status').classList.remove('hidden');
+        }
+
+        function awardPoints(winnerId) {
+            socket.emit('award_points', { roomCode: currentRoom, winnerId });
+        }
+
+        function triggerNextRound() {
+            socket.emit('next_round', currentRoom);
+        }
+
+        socket.on('room_joined', ({ roomCode, players, isHost: hostStatus }) => {
+            currentRoom = roomCode;
+            isHost = hostStatus;
             document.getElementById('display-room-code').innerText = roomCode;
-            if (data.isHost) {
+            if (isHost) {
                 document.getElementById('host-controls').classList.remove('hidden');
-                document.getElementById('guest-waiting').classList.add('hidden');
+                document.getElementById('waiting-controls').classList.add('hidden');
             }
-            switchScreen('screen-lobby');
+            updatePlayerList(players);
+            showScreen('screen-lobby');
         });
 
-        socket.on('errorMsg', (msg) => { alert(msg); });
-
-        socket.on('updatePlayers', (players) => {
-            playersData = players;
-            const listEl = document.getElementById('players-list');
-            if (!listEl) return;
-            listEl.innerHTML = '';
-            players.forEach(p => {
-                const div = document.createElement('div');
-                div.className = 'flex items-center gap-2 bg-white p-2 rounded-lg border border-[#8c6239] font-bold text-[#2c1810] text-sm';
-                div.innerHTML = `<span>${p.avatar}</span> <span class="truncate">${p.username}</span> ${p.isHost ? '👑' : ''}`;
-                listEl.appendChild(div);
-            });
+        socket.on('update_players', (players) => {
+            updatePlayerList(players);
         });
 
-        // Start Game (Host)
-        const startBtn = document.getElementById('btn-start-game');
-        if (startBtn) {
-            startBtn.addEventListener('click', () => { socket.emit('startGame', { roomCode }); });
-        }
-
-        // Writing Phase
-        socket.on('startWriting', (data) => {
-            document.getElementById('assigned-prompt').innerText = data.prompt;
-            document.getElementById('input-answer').value = '';
-            document.getElementById('btn-submit-answer').disabled = false;
-            document.getElementById('writing-status').innerText = '';
-            switchScreen('screen-writing');
-            startTimer(60, 'timer-writing', () => { submitAnswer(true); });
+        socket.on('you_are_host', () => {
+            isHost = true;
+            document.getElementById('host-controls').classList.remove('hidden');
+            document.getElementById('waiting-controls').classList.add('hidden');
         });
 
-        const submitAnsBtn = document.getElementById('btn-submit-answer');
-        if (submitAnsBtn) {
-            submitAnsBtn.addEventListener('click', () => { submitAnswer(false); });
+        function updatePlayerList(players) {
+            document.getElementById('player-count').innerText = players.length;
+            const list = document.getElementById('player-list');
+            list.innerHTML = players.map(p => `
+                <li class="bg-gray-900 border border-gray-800 px-4 py-2.5 rounded-lg flex justify-between items-center text-sm">
+                    <span class="text-gray-200">${p.name}</span>
+                    <span class="text-xs text-gray-500">${p.score || 0} pts</span>
+                </li>
+            `).join('');
         }
 
-        function submitAnswer(isTimeout) {
-            const answer = document.getElementById('input-answer').value.trim() || "(No Answer)";
-            socket.emit('submitAnswer', { roomCode, answer });
-            document.getElementById('btn-submit-answer').disabled = true;
-            document.getElementById('writing-status').innerText = isTimeout ? 'Time expired! Answer locked.' : 'Answer submitted! Waiting for others...';
-        }
+        socket.on('game_started', ({ prompt, role }) => {
+            document.getElementById('answer-input').value = '';
+            document.getElementById('submit-btn').disabled = false;
+            document.getElementById('submit-btn').classList.remove('opacity-50', 'cursor-not-allowed');
+            document.getElementById('waiting-status').classList.add('hidden');
 
-        let currentTimerInterval = null;
-        function startTimer(duration, elementId, onComplete) {
-            clearInterval(currentTimerInterval);
-            let timeLeft = duration;
-            const timerEl = document.getElementById(elementId);
-            if (!timerEl) return;
-            timerEl.innerText = timeLeft;
-            currentTimerInterval = setInterval(() => {
-                timeLeft--;
-                timerEl.innerText = timeLeft;
-                if (timeLeft <= 0) {
-                    clearInterval(currentTimerInterval);
-                    if (onComplete) onComplete();
-                }
-            }, 1000);
-        }
+            const badge = document.getElementById('role-badge');
+            if (role === 'imposter') {
+                badge.innerText = 'CLASSIFIED: YOU ARE THE IMPOSTER';
+                badge.className = 'inline-block px-3 py-1 rounded text-xs font-bold uppercase tracking-widest mb-2 bg-red-950 text-red-400 border border-red-800';
+            } else {
+                badge.innerText = 'CLEARANCE: INNOCENT INVESTIGATOR';
+                badge.className = 'inline-block px-3 py-1 rounded text-xs font-bold uppercase tracking-widest mb-2 bg-emerald-950 text-emerald-400 border border-emerald-800';
+            }
 
-        // Debate Phase
-        socket.on('startDebate', (data) => {
-            clearInterval(currentTimerInterval);
-            document.getElementById('display-real-prompt').innerText = data.realPrompt;
+            document.getElementById('prompt-text').innerText = prompt;
+            showScreen('screen-game');
+        });
+
+        socket.on('show_answers', (players) => {
             const container = document.getElementById('answers-container');
-            container.innerHTML = '';
-            data.submissions.forEach(sub => {
-                const div = document.createElement('div');
-                div.className = 'bg-white p-2 rounded-lg border border-[#8c6239] text-sm text-[#2c1810]';
-                div.innerHTML = `<strong>${sub.avatar} ${sub.username}:</strong> "${sub.answer}"`;
-                container.appendChild(div);
-            });
+            container.innerHTML = players.map(p => `
+                <div class="bg-gray-900 border border-gray-800 p-3 rounded-lg">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-bold text-emerald-400">${p.name}</span>
+                        ${isHost ? `<button onclick="awardPoints('${p.id}')" class="text-xs bg-gray-800 hover:bg-emerald-600 hover:text-black text-gray-300 px-2 py-0.5 rounded transition">Award Points</button>` : ''}
+                    </div>
+                    <p class="text-sm text-gray-200">${p.answer || 'No response'}</p>
+                </div>
+            `).join('');
 
-            if (isHost) { document.getElementById('debate-host-controls').classList.remove('hidden'); }
-            document.getElementById('debate-timer-box').classList.add('hidden');
-            switchScreen('screen-debate');
+            const revealControls = document.getElementById('host-reveal-controls');
+            if (isHost) {
+                revealControls.classList.remove('hidden');
+            } else {
+                revealControls.classList.add('hidden');
+            }
+
+            showScreen('screen-reveal');
         });
 
-        const triggerTimerBtn = document.getElementById('btn-trigger-timer');
-        if (triggerTimerBtn) {
-            triggerTimerBtn.addEventListener('click', () => { socket.emit('triggerDebateTimer', { roomCode }); });
-        }
+        socket.on('round_results', ({ players, gameOver, champion }) => {
+            const list = document.getElementById('scoreboard-list');
+            list.innerHTML = players.map(p => `
+                <li class="bg-gray-900 border border-gray-800 px-4 py-3 rounded-lg flex justify-between items-center text-sm">
+                    <span class="text-gray-200 font-bold">${p.name}</span>
+                    <span class="text-emerald-400 font-bold">${p.score} pts</span>
+                </li>
+            `).join('');
 
-        socket.on('debateTimerTriggered', () => {
-            document.getElementById('debate-timer-box').classList.remove('hidden');
-            startTimer(30, 'timer-debate', () => { socket.emit('forceProceedToVoting', { roomCode }); });
+            if (gameOver && champion) {
+                document.getElementById('champion-name').innerText = `${champion.name} Wins the Game!`;
+                document.getElementById('winner-announcement').classList.remove('hidden');
+                document.getElementById('host-next-round-controls').classList.add('hidden');
+            } else {
+                if (isHost) {
+                    document.getElementById('host-next-round-controls').classList.remove('hidden');
+                } else {
+                    document.getElementById('host-next-round-controls').classList.add('hidden');
+                }
+            }
+            showScreen('screen-scores');
         });
 
-        const proceedVotingBtn = document.getElementById('btn-proceed-voting');
-        if (proceedVotingBtn) {
-            proceedVotingBtn.addEventListener('click', () => { socket.emit('forceProceedToVoting', { roomCode }); });
-        }
-
-        // Voting Phase
-        socket.on('startVoting', (players) => {
-            clearInterval(currentTimerInterval);
-            const grid = document.getElementById('voting-grid');
-            grid.innerHTML = '';
-            document.getElementById('voting-status').innerText = '';
-
-            players.forEach(p => {
-                const btn = document.createElement('button');
-                btn.className = 'p-3 bg-white border-2 border-[#8c6239] rounded-xl hover:bg-[#faebd7] transition font-bold text-[#2c1810] flex items-center justify-center gap-2';
-                btn.innerHTML = `<span>${p.avatar}</span> <span>${p.username}</span>`;
-                btn.addEventListener('click', () => {
-                    socket.emit('submitVote', { roomCode, suspectId: p.id });
-                    document.querySelectorAll('#voting-grid button').forEach(b => b.disabled = true);
-                    document.getElementById('voting-status').innerText = 'Vote recorded! Awaiting verdict...';
-                });
-                grid.appendChild(btn);
-            });
-            switchScreen('screen-voting');
+        socket.on('error_message', (msg) => {
+            showError(msg);
         });
-
-        // Results Phase
-        socket.on('showResults', (data) => {
-            const imposter = data.imposter;
-            document.getElementById('reveal-imposter').innerText = `${imposter.avatar} ${imposter.username}`;
-            document.getElementById('result-headline').innerText = data.imposterWon ? 'Imposter Escaped!' : 'Detectives Triumphed!';
-            document.getElementById('result-subtext').innerText = data.imposterWon ? 'The imposter successfully fooled the library!' : 'The table successfully identified the culprit!';
-
-            const lb = document.getElementById('leaderboard-list');
-            lb.innerHTML = '';
-            data.scores.forEach(s => {
-                const div = document.createElement('div');
-                div.className = 'flex justify-between items-center bg-white p-2 rounded-lg border border-[#8c6239] font-bold text-[#2c1810] text-sm';
-                div.innerHTML = `<span>${s.avatar} ${s.username}</span> <span class="bg-[#5c3a21] text-[#f4ebd0] px-2 py-0.5 rounded">${s.score} pts</span>`;
-                lb.appendChild(div);
-            });
-
-            if (isHost) { document.getElementById('results-host-controls').classList.remove('hidden'); }
-            switchScreen('screen-results');
-        });
-
-        const nextRoundBtn = document.getElementById('btn-next-round');
-        if (nextRoundBtn) {
-            nextRoundBtn.addEventListener('click', () => { socket.emit('nextRound', { roomCode }); });
-        }
     </script>
 </body>
 </html>

@@ -82,7 +82,7 @@ io.on('connection', (socket) => {
             return socket.emit('error_message', 'Room not found or game already started.');
         }
 
-        // Check if icon is already taken
+        // Prevent duplicate icons
         if (room.players.some(p => p.icon === icon)) {
             return socket.emit('error_message', 'That icon is already chosen by another detective.');
         }

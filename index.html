@@ -17,6 +17,10 @@
             border: 1px solid #374151;
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7);
         }
+        .icon-option.selected {
+            border-color: #34d399;
+            background-color: #064e3b;
+        }
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
@@ -40,11 +44,18 @@
                     class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500">
             </div>
 
-            <button onclick="createRoom()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-black font-bold py-3 rounded-lg transition tracking-wide uppercase text-sm">
+            <div>
+                <label class="block text-xs uppercase text-gray-400 mb-2">Choose Your Detective Icon</label>
+                <div id="icon-grid" class="grid grid-cols-2 gap-2 max-h-44 overflow-y-auto pr-1">
+                    <!-- Populated via JS -->
+                </div>
+            </div>
+
+            <button onclick="createRoom()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-black font-bold py-3 rounded-lg transition tracking-wide uppercase text-sm mt-2">
                 Host New Case
             </button>
 
-            <div class="relative flex py-2 items-center">
+            <div class="relative flex py-1 items-center">
                 <div class="flex-grow border-t border-gray-800"></div>
                 <span class="flex-shrink mx-4 text-gray-600 text-xs uppercase">Or Join</span>
                 <div class="flex-grow border-t border-gray-800"></div>
@@ -107,16 +118,17 @@
         <div id="screen-discussion" class="hidden space-y-6">
             <div class="text-center">
                 <h2 class="text-lg font-bold text-emerald-400 uppercase tracking-wider">Discussion Phase</h2>
+                <p id="discussion-timer-display" class="text-xs text-emerald-400 font-bold mt-1">Discuss the evidence below</p>
                 <p id="discussion-prompt" class="text-xs text-gray-300 mt-1 italic"></p>
             </div>
 
             <div id="discussion-answers" class="space-y-3 max-h-60 overflow-y-auto pr-1"></div>
 
             <div id="host-discussion-controls" class="hidden space-y-2">
-                <button onclick="triggerVotingTimer()" id="timer-30-btn" class="w-full bg-gray-800 hover:bg-gray-700 text-emerald-400 border border-gray-700 font-bold py-2.5 rounded-lg transition text-xs uppercase tracking-wide">
+                <button onclick="triggerDiscussionTimer()" id="timer-30-btn" class="w-full bg-gray-800 hover:bg-gray-700 text-emerald-400 border border-gray-700 font-bold py-2.5 rounded-lg transition text-xs uppercase tracking-wide">
                     Start 30s Discussion Timer
                 </button>
-                <button onclick="startVotingPhase()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-black font-bold py-3 rounded-lg transition tracking-wide uppercase text-sm">
+                <button onclick="startVotingPhaseHost()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-black font-bold py-3 rounded-lg transition tracking-wide uppercase text-sm">
                     Proceed to Voting
                 </button>
             </div>
@@ -143,7 +155,15 @@
                 <p id="imposter-reveal" class="text-xs font-bold mt-1 uppercase"></p>
             </div>
 
-            <ul id="scoreboard-list" class="space-y-2"></ul>
+            <div class="space-y-3">
+                <h3 class="text-xs uppercase text-gray-400 tracking-wider">Accusations Breakdown</h3>
+                <div id="voting-breakdown-list" class="space-y-2 max-h-40 overflow-y-auto pr-1"></div>
+            </div>
+
+            <div class="space-y-2 pt-2 border-t border-gray-800">
+                <h3 class="text-xs uppercase text-gray-400 tracking-wider">Standings</h3>
+                <ul id="scoreboard-list" class="space-y-2"></ul>
+            </div>
 
             <div id="winner-announcement" class="hidden text-center bg-emerald-950/40 border border-emerald-800 p-4 rounded-lg">
                 <h3 id="champion-name" class="text-xl font-bold text-emerald-300"></h3>
@@ -164,7 +184,45 @@
         let currentRoom = '';
         let isHost = false;
         let responseInterval = null;
+        let discussionInterval = null;
         let activePlayersCache = [];
+        let selectedIcon = '';
+
+        const iconList = [
+            "Magnifying Glass",
+            "Question Mark",
+            "Anonymous Silhouette",
+            "Wrapped Envelope",
+            "Partial Fingerprint",
+            "Master Key",
+            "Hourglass",
+            "Interrogation Lamp",
+            "Footprints",
+            "Detective Owl"
+        ];
+
+        function renderIconGrid(takenIcons = []) {
+            const grid = document.getElementById('icon-grid');
+            grid.innerHTML = iconList.map(icon => {
+                const isTaken = takenIcons.includes(icon);
+                const isSelected = selectedIcon === icon;
+                return `
+                    <button type="button" onclick="${isTaken ? '' : `selectIcon('${icon}')`}" 
+                        class="p-2.5 rounded-lg border text-xs text-left transition flex items-center justify-between ${isTaken ? 'bg-gray-950 border-gray-900 text-gray-600 cursor-not-allowed opacity-50' : isSelected ? 'bg-emerald-950 border-emerald-500 text-emerald-300 font-bold' : 'bg-gray-900 border-gray-800 text-gray-300 hover:border-gray-600'}">
+                        <span>${icon}</span>
+                        ${isTaken ? '<span class="text-[10px] text-red-500 uppercase">Taken</span>' : isSelected ? '<span class="text-[10px] text-emerald-400 uppercase">Selected</span>' : ''}
+                    </button>
+                `;
+            }).join('');
+        }
+
+        function selectIcon(icon) {
+            selectedIcon = icon;
+            renderIconGrid(window.lastTakenIcons || []);
+        }
+
+        // Initial render
+        renderIconGrid();
 
         function showError(msg) {
             const banner = document.getElementById('error-banner');
@@ -183,15 +241,17 @@
         function createRoom() {
             const playerName = document.getElementById('player-name').value.trim();
             if (!playerName) return showError('Please enter your detective name.');
-            socket.emit('create_room', { playerName });
+            if (!selectedIcon) return showError('Please choose an icon.');
+            socket.emit('create_room', { playerName, icon: selectedIcon });
         }
 
         function joinRoom() {
             const playerName = document.getElementById('player-name').value.trim();
             const roomCode = document.getElementById('room-code-input').value.trim().toUpperCase();
             if (!playerName) return showError('Please enter your detective name.');
+            if (!selectedIcon) return showError('Please choose an icon.');
             if (!roomCode || roomCode.length !== 4) return showError('Please enter a valid 4-character case code.');
-            socket.emit('join_room', { roomCode, playerName });
+            socket.emit('join_room', { roomCode, playerName, icon: selectedIcon });
         }
 
         function startGame() {
@@ -207,23 +267,12 @@
             document.getElementById('waiting-status').classList.remove('hidden');
         }
 
-        function startVotingPhase() {
-            socket.emit('start_voting_phase', currentRoom);
+        function triggerDiscussionTimer() {
+            socket.emit('trigger_discussion_timer', currentRoom);
         }
 
-        function triggerVotingTimer() {
-            let seconds = 30;
-            const btn = document.getElementById('timer-30-btn');
-            btn.disabled = true;
-            btn.innerText = `Discussion Timer: ${seconds}s`;
-            const interval = setInterval(() => {
-                seconds--;
-                btn.innerText = `Discussion Timer: ${seconds}s`;
-                if (seconds <= 0) {
-                    clearInterval(interval);
-                    btn.innerText = "Timer Ended";
-                }
-            }, 1000);
+        function startVotingPhaseHost() {
+            socket.emit('start_voting_phase_host', currentRoom);
         }
 
         function castVote(votedId) {
@@ -261,11 +310,14 @@
 
         function updatePlayerList(players) {
             activePlayersCache = players;
+            window.lastTakenIcons = players.map(p => p.icon);
+            renderIconGrid(window.lastTakenIcons);
+
             document.getElementById('player-count').innerText = players.length;
             const list = document.getElementById('player-list');
             list.innerHTML = players.map(p => `
                 <li class="bg-gray-900 border border-gray-800 px-4 py-2.5 rounded-lg flex justify-between items-center text-sm">
-                    <span class="text-gray-200">${p.name}</span>
+                    <span class="text-gray-200"><strong class="text-emerald-400">[${p.icon}]</strong> ${p.name}</span>
                     <span class="text-xs text-gray-500">${p.score || 0} pts</span>
                 </li>
             `).join('');
@@ -295,12 +347,13 @@
         socket.on('show_discussion', ({ innocentPrompt, players }) => {
             clearInterval(responseInterval);
             activePlayersCache = players;
+            document.getElementById('discussion-timer-display').innerText = "Discuss the evidence below";
             document.getElementById('discussion-prompt').innerText = `Standard Question: "${innocentPrompt}"`;
             
             const container = document.getElementById('discussion-answers');
             container.innerHTML = players.map(p => `
                 <div class="bg-gray-900 border border-gray-800 p-3 rounded-lg">
-                    <span class="text-xs font-bold text-emerald-400 block mb-1">${p.name}</span>
+                    <span class="text-xs font-bold text-emerald-400 block mb-1">[${p.icon}] ${p.name}</span>
                     <p class="text-sm text-gray-200">${p.answer}</p>
                 </div>
             `).join('');
@@ -315,12 +368,28 @@
             showScreen('screen-discussion');
         });
 
+        socket.on('start_discussion_timer_ui', (duration) => {
+            let timeLeft = duration;
+            const timerDisplay = document.getElementById('discussion-timer-display');
+            timerDisplay.innerText = `Discussion Time Remaining: ${timeLeft}s`;
+            
+            if (discussionInterval) clearInterval(discussionInterval);
+            discussionInterval = setInterval(() => {
+                timeLeft--;
+                timerDisplay.innerText = `Discussion Time Remaining: ${timeLeft}s`;
+                if (timeLeft <= 0) {
+                    clearInterval(discussionInterval);
+                }
+            }, 1000);
+        });
+
         socket.on('start_voting', () => {
+            if (discussionInterval) clearInterval(discussionInterval);
             document.getElementById('voted-status').classList.add('hidden');
             const votingList = document.getElementById('voting-list');
             votingList.innerHTML = activePlayersCache.map(p => `
                 <button onclick="castVote('${p.id}')" class="w-full bg-gray-900 hover:bg-emerald-600 hover:text-black border border-gray-800 text-gray-200 p-3 rounded-lg text-sm font-bold transition flex justify-between items-center">
-                    <span>${p.name}</span>
+                    <span>[${p.icon}] ${p.name}</span>
                     <span class="text-xs uppercase opacity-75">Accuse</span>
                 </button>
             `).join('');
@@ -328,27 +397,44 @@
         });
 
         socket.on('round_results', ({ players, imposterId, imposterCaught, gameOver, champion }) => {
+            if (discussionInterval) clearInterval(discussionInterval);
             const imposter = players.find(p => p.id === imposterId);
             const revealText = document.getElementById('imposter-reveal');
             
             if (imposterCaught) {
-                revealText.innerText = `Imposter Was Caught: ${imposter ? imposter.name : 'Unknown'}! (Detectives scored points)`;
+                revealText.innerText = `Imposter Caught: [${imposter.icon}] ${imposter.name}!`;
                 revealText.className = 'text-xs font-bold mt-1 uppercase text-emerald-400';
             } else {
-                revealText.innerText = `Imposter Survived: ${imposter ? imposter.name : 'Unknown'}! (Imposter scored 3 points)`;
+                revealText.innerText = `Imposter Survived: [${imposter.icon}] ${imposter.name}!`;
                 revealText.className = 'text-xs font-bold mt-1 uppercase text-red-400';
             }
+
+            // Voting breakdown showing voter icons next to accused players
+            const breakdownContainer = document.getElementById('voting-breakdown-list');
+            breakdownContainer.innerHTML = players.map(suspect => {
+                const voters = players.filter(p => p.vote === suspect.id);
+                const voterIconsHtml = voters.length > 0 
+                    ? voters.map(v => `<span class="bg-gray-800 text-emerald-400 border border-gray-700 px-2 py-0.5 rounded text-xs font-bold mr-1">[${v.icon}] ${v.name}</span>`).join('')
+                    : '<span class="text-gray-600 text-xs italic">No votes</span>';
+
+                return `
+                    <div class="bg-gray-900 border border-gray-800 p-2.5 rounded-lg flex justify-between items-center text-sm">
+                        <span class="text-gray-300">[${suspect.icon}] ${suspect.name}</span>
+                        <div class="flex flex-wrap gap-1">${voterIconsHtml}</div>
+                    </div>
+                `;
+            }).join('');
 
             const list = document.getElementById('scoreboard-list');
             list.innerHTML = players.map(p => `
                 <li class="bg-gray-900 border border-gray-800 px-4 py-3 rounded-lg flex justify-between items-center text-sm">
-                    <span class="text-gray-200 font-bold">${p.name} ${p.id === imposterId ? '<span class="text-xs text-red-400 font-normal">(Imposter)</span>' : ''}</span>
+                    <span class="text-gray-200 font-bold">[${p.icon}] ${p.name} ${p.id === imposterId ? '<span class="text-xs text-red-400 font-normal">(Imposter)</span>' : ''}</span>
                     <span class="text-emerald-400 font-bold">${p.score} pts</span>
                 </li>
             `).join('');
 
             if (gameOver && champion) {
-                document.getElementById('champion-name').innerText = `${champion.name} Wins the Game!`;
+                document.getElementById('champion-name').innerText = `[${champion.icon}] ${champion.name} Wins the Game!`;
                 document.getElementById('winner-announcement').classList.remove('hidden');
                 document.getElementById('host-next-round-controls').classList.add('hidden');
             } else {

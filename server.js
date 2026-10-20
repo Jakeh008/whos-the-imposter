@@ -63,28 +63,34 @@ const promptPairs = [
 let rooms = {};
 
 io.on('connection', (socket) => {
-    socket.on('create_room', ({ playerName }) => {
+    socket.on('create_room', ({ playerName, icon }) => {
         const roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
         rooms[roomCode] = {
             host: socket.id,
-            players: [{ id: socket.id, name: playerName, score: 0 }],
+            players: [{ id: socket.id, name: playerName, icon, score: 0 }],
             gameState: 'lobby',
-            timer: null
+            timer: null,
+            discussionTimer: null
         };
         socket.join(roomCode);
         socket.emit('room_joined', { roomCode, players: rooms[roomCode].players, isHost: true });
     });
 
-    socket.on('join_room', ({ roomCode, playerName }) => {
+    socket.on('join_room', ({ roomCode, playerName, icon }) => {
         const room = rooms[roomCode];
-        if (room && room.gameState === 'lobby') {
-            room.players.push({ id: socket.id, name: playerName, score: 0 });
-            socket.join(roomCode);
-            io.to(roomCode).emit('update_players', room.players);
-            socket.emit('room_joined', { roomCode, players: room.players, isHost: false });
-        } else {
-            socket.emit('error_message', 'Room not found or game already started.');
+        if (!room || room.gameState !== 'lobby') {
+            return socket.emit('error_message', 'Room not found or game already started.');
         }
+
+        // Check if icon is already taken
+        if (room.players.some(p => p.icon === icon)) {
+            return socket.emit('error_message', 'That icon is already chosen by another detective.');
+        }
+
+        room.players.push({ id: socket.id, name: playerName, icon, score: 0 });
+        socket.join(roomCode);
+        io.to(roomCode).emit('update_players', room.players);
+        socket.emit('room_joined', { roomCode, players: room.players, isHost: false });
     });
 
     socket.on('start_game', (roomCode) => {
@@ -110,12 +116,23 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('start_voting_phase', (roomCode) => {
+    socket.on('trigger_discussion_timer', (roomCode) => {
         const room = rooms[roomCode];
         if (!room || room.host !== socket.id) return;
-        clearTimeout(room.timer);
-        room.players.forEach(p => p.vote = null);
-        io.to(roomCode).emit('start_voting');
+
+        io.to(roomCode).emit('start_discussion_timer_ui', 30);
+
+        if (room.discussionTimer) clearTimeout(room.discussionTimer);
+        room.discussionTimer = setTimeout(() => {
+            startVotingPhase(roomCode);
+        }, 30000);
+    });
+
+    socket.on('start_voting_phase_host', (roomCode) => {
+        const room = rooms[roomCode];
+        if (!room || room.host !== socket.id) return;
+        if (room.discussionTimer) clearTimeout(room.discussionTimer);
+        startVotingPhase(roomCode);
     });
 
     socket.on('submit_vote', ({ roomCode, votedId }) => {
@@ -144,6 +161,7 @@ io.on('connection', (socket) => {
             room.players = room.players.filter(p => p.id !== socket.id);
             if (room.players.length === 0) {
                 clearTimeout(room.timer);
+                clearTimeout(room.discussionTimer);
                 delete rooms[roomCode];
             } else {
                 if (room.host === socket.id) {
@@ -159,6 +177,8 @@ io.on('connection', (socket) => {
 function startNewRound(roomCode) {
     const room = rooms[roomCode];
     if (!room) return;
+
+    if (room.discussionTimer) clearTimeout(room.discussionTimer);
 
     room.players.forEach(p => {
         p.answer = null;
@@ -183,31 +203,36 @@ function startNewRound(roomCode) {
 function startDiscussionPhase(roomCode) {
     const room = rooms[roomCode];
     if (!room) return;
+    if (room.timer) clearTimeout(room.timer);
 
     io.to(roomCode).emit('show_discussion', {
         innocentPrompt: room.currentInnocentPrompt,
-        players: room.players.map(p => ({ id: p.id, name: p.name, answer: p.answer || 'No response' }))
+        players: room.players.map(p => ({ id: p.id, name: p.name, icon: p.icon, answer: p.answer || 'No response' }))
     });
+}
+
+function startVotingPhase(roomCode) {
+    const room = rooms[roomCode];
+    if (!room) return;
+    if (room.discussionTimer) clearTimeout(room.discussionTimer);
+    room.players.forEach(p => p.vote = null);
+    io.to(roomCode).emit('start_voting');
 }
 
 function processResults(roomCode) {
     const room = rooms[roomCode];
     if (!room) return;
 
-    // Count votes for the imposter
     const votesForImposter = room.players.filter(p => p.vote === room.imposterId).length;
     const totalPlayers = room.players.length;
     const imposterCaught = votesForImposter >= (totalPlayers / 2);
 
-    // Score evaluation based on user requirements from Gemini Conversations
     room.players.forEach(p => {
         if (p.id !== room.imposterId) {
-            // Innocent Detectives: 1 point for each correct vote identifying the imposter
             if (p.vote === room.imposterId) {
                 p.score += 1;
             }
         } else {
-            // Imposter: 3 points if they successfully survive with fewer than 50% voting for them, 0 points otherwise
             if (!imposterCaught) {
                 p.score += 3;
             }
@@ -225,7 +250,7 @@ function processResults(roomCode) {
     });
 
     io.to(roomCode).emit('round_results', {
-        players: room.players,
+        players: room.players.map(p => ({ id: p.id, name: p.name, icon: p.icon, score: p.score, vote: p.vote })),
         imposterId: room.imposterId,
         imposterCaught,
         gameOver,

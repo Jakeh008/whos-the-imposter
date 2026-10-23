@@ -111,6 +111,14 @@
                     Submit Evidence
                 </button>
             </div>
+
+            <!-- Host Timer Pause/Resume Control -->
+            <div id="host-timer-controls" class="hidden pt-2">
+                <button onclick="togglePauseTimer()" id="pause-timer-btn" class="w-full bg-gray-800 hover:bg-gray-700 text-amber-400 border border-amber-600/40 font-bold py-2 rounded-lg transition text-xs uppercase tracking-wide">
+                    Pause Timer
+                </button>
+            </div>
+
             <p id="waiting-status" class="text-center text-xs text-gray-500 hidden">Evidence logged. Awaiting remaining investigators...</p>
         </div>
 
@@ -141,10 +149,10 @@
         <div id="screen-voting" class="hidden space-y-6">
             <div class="text-center">
                 <h2 class="text-lg font-bold text-emerald-400 uppercase tracking-wider">Unmask The Imposter</h2>
-                <p class="text-xs text-gray-400 mt-1">Select who you believe is the imposter. (You can change your vote until everyone locks in!)</p>
+                <p class="text-xs text-gray-400 mt-1">Review answers below and select who you believe is the imposter.</p>
             </div>
 
-            <div id="voting-list" class="space-y-2 max-h-60 overflow-y-auto pr-1"></div>
+            <div id="voting-list" class="space-y-3 max-h-72 overflow-y-auto pr-1"></div>
             <div id="voting-status-box" class="text-center text-xs text-emerald-400 pt-2 font-bold"></div>
         </div>
 
@@ -183,7 +191,6 @@
         const socket = io();
         let currentRoom = '';
         let isHost = false;
-        let responseInterval = null;
         let discussionInterval = null;
         let activePlayersCache = [];
         let selectedIconId = '';
@@ -258,6 +265,10 @@
             socket.emit('start_game', currentRoom);
         }
 
+        function togglePauseTimer() {
+            socket.emit('toggle_pause_timer', currentRoom);
+        }
+
         function submitAnswer() {
             const answer = document.getElementById('answer-input').value.trim();
             if (!answer) return showError('Please enter a response.');
@@ -287,13 +298,18 @@
             votingList.innerHTML = players.map(p => {
                 const isMyChoice = myCurrentVote === p.id;
                 return `
-                    <button onclick="castVote('${p.id}')" class="w-full border p-3 rounded-lg text-sm font-bold transition flex justify-between items-center ${isMyChoice ? 'bg-emerald-950 border-emerald-500 text-emerald-300' : 'bg-gray-900 hover:bg-emerald-900/40 border-gray-800 text-gray-200'}">
-                        <span class="flex items-center gap-2">
-                            <span class="text-lg">${icons[p.icon] || ''}</span>
-                            ${p.name}
-                        </span>
-                        <span class="text-xs uppercase opacity-75">${isMyChoice ? 'Your Accusation (Click to Change)' : 'Accuse'}</span>
-                    </button>
+                    <div class="bg-gray-900 border ${isMyChoice ? 'border-emerald-500 bg-emerald-950/30' : 'border-gray-800'} p-3 rounded-lg flex flex-col gap-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-bold text-emerald-400 flex items-center gap-2">
+                                <span class="text-base">${icons[p.icon] || ''}</span>
+                                ${p.name}
+                            </span>
+                        </div>
+                        <p class="text-xs text-gray-300 italic bg-gray-950/50 p-2 rounded border border-gray-800">"${p.answer || '(No response)'}"</p>
+                        <button onclick="castVote('${p.id}')" class="w-full border py-2 rounded-lg text-xs font-bold transition flex justify-center items-center gap-1 ${isMyChoice ? 'bg-emerald-900 border-emerald-500 text-emerald-200' : 'bg-gray-800 hover:bg-emerald-900/40 border-gray-700 text-gray-200'}">
+                            <span>${isMyChoice ? 'Your Accusation (Click to Change)' : 'Accuse This Detective'}</span>
+                        </button>
+                    </div>
                 `;
             }).join('');
         }
@@ -342,30 +358,45 @@
             `).join('');
         }
 
-        socket.on('game_started', ({ prompt }) => {
+        socket.on('game_started', ({ prompt, duration }) => {
             myCurrentVote = null;
             document.getElementById('answer-input').value = '';
             document.getElementById('submit-btn').disabled = false;
             document.getElementById('submit-btn').classList.remove('opacity-50', 'cursor-not-allowed');
             document.getElementById('waiting-status').classList.add('hidden');
             document.getElementById('prompt-text').innerText = prompt;
+            document.getElementById('timer-display').innerText = `${duration}s`;
 
-            let timeLeft = 67;
-            document.getElementById('timer-display').innerText = `${timeLeft}s`;
-            clearInterval(responseInterval);
-            responseInterval = setInterval(() => {
-                timeLeft--;
-                document.getElementById('timer-display').innerText = `${timeLeft}s`;
-                if (timeLeft <= 0) {
-                    clearInterval(responseInterval);
-                }
-            }, 1000);
+            if (isHost) {
+                document.getElementById('host-timer-controls').classList.remove('hidden');
+                document.getElementById('pause-timer-btn').innerText = "Pause Timer";
+            } else {
+                document.getElementById('host-timer-controls').classList.add('hidden');
+            }
 
             showScreen('screen-game');
         });
 
+        socket.on('timer_tick', (timeLeft) => {
+            document.getElementById('timer-display').innerText = `${timeLeft}s`;
+        });
+
+        socket.on('timer_pause_status', ({ paused }) => {
+            const btn = document.getElementById('pause-timer-btn');
+            const display = document.getElementById('timer-display');
+            if (paused) {
+                if (btn) btn.innerText = "Resume Timer";
+                display.classList.add('text-amber-400');
+                display.classList.remove('text-emerald-400');
+                display.innerText += " (PAUSED)";
+            } else {
+                if (btn) btn.innerText = "Pause Timer";
+                display.classList.remove('text-amber-400');
+                display.classList.add('text-emerald-400');
+            }
+        });
+
         socket.on('show_discussion', ({ innocentPrompt, players }) => {
-            clearInterval(responseInterval);
             activePlayersCache = players;
             document.getElementById('discussion-timer-display').innerText = "Discuss the evidence below";
             document.getElementById('discussion-prompt').innerText = `Standard Question: "${innocentPrompt}"`;
@@ -406,11 +437,12 @@
             }, 1000);
         });
 
-        socket.on('start_voting', () => {
+        socket.on('start_voting', ({ players }) => {
             if (discussionInterval) clearInterval(discussionInterval);
             myCurrentVote = null;
-            document.getElementById('voting-status-box').innerText = "Make your choice. You can modify it until all players vote.";
-            renderVotingList(activePlayersCache);
+            activePlayersCache = players;
+            document.getElementById('voting-status-box').innerText = "Review answers and make your choice. You can modify your vote until everyone locks in.";
+            renderVotingList(players);
             showScreen('screen-voting');
         });
 

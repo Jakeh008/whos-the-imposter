@@ -290,7 +290,9 @@ io.on('connection', (socket) => {
             host: socket.id,
             players: [{ id: socket.id, name: playerName, icon, score: 0, answer: '', vote: null }],
             state: 'lobby',
-            currentPromptIndex: 0
+            currentPromptIndex: 0,
+            timerPaused: false,
+            responseTimer: 67
         };
         socket.join(roomCode);
         socket.emit('room_joined', { roomCode, players: rooms[roomCode].players, isHost: true });
@@ -324,6 +326,13 @@ io.on('connection', (socket) => {
         startNewRound(roomCode);
     });
 
+    socket.on('toggle_pause_timer', (roomCode) => {
+        const room = rooms[roomCode];
+        if (!room || room.host !== socket.id || room.state !== 'game') return;
+        room.timerPaused = !room.timerPaused;
+        io.to(roomCode).emit('timer_pause_status', { paused: room.timerPaused });
+    });
+
     socket.on('submit_answer', ({ roomCode, answer }) => {
         const room = rooms[roomCode];
         if (!room) return;
@@ -333,6 +342,7 @@ io.on('connection', (socket) => {
         }
 
         if (room.players.every(p => p.answer.trim() !== '')) {
+            if (room.intervalHandle) clearInterval(room.intervalHandle);
             room.state = 'discussion';
             io.to(roomCode).emit('show_discussion', {
                 innocentPrompt: room.currentPair.real,
@@ -352,7 +362,9 @@ io.on('connection', (socket) => {
         if (!room || room.host !== socket.id) return;
         room.state = 'voting';
         room.players.forEach(p => p.vote = null);
-        io.to(roomCode).emit('start_voting');
+        io.to(roomCode).emit('start_voting', {
+            players: room.players.map(p => ({ id: p.id, name: p.name, icon: p.icon, answer: p.answer }))
+        });
     });
 
     socket.on('submit_vote', ({ roomCode, votedId }) => {
@@ -384,6 +396,7 @@ io.on('connection', (socket) => {
             if (index !== -1) {
                 room.players.splice(index, 1);
                 if (room.players.length === 0) {
+                    if (room.intervalHandle) clearInterval(room.intervalHandle);
                     delete rooms[roomCode];
                 } else {
                     if (room.host === socket.id) {
@@ -401,6 +414,8 @@ io.on('connection', (socket) => {
 function startNewRound(roomCode) {
     const room = rooms[roomCode];
     room.state = 'game';
+    room.timerPaused = false;
+    room.responseTimer = 67;
     room.currentPair = promptPairs[Math.floor(Math.random() * promptPairs.length)];
     const imposterIndex = Math.floor(Math.random() * room.players.length);
     room.imposterId = room.players[imposterIndex].id;
@@ -409,13 +424,37 @@ function startNewRound(roomCode) {
         p.answer = '';
         p.vote = null;
         const assignedPrompt = (idx === imposterIndex) ? room.currentPair.imposter : room.currentPair.real;
-        io.to(p.id).emit('game_started', { prompt: assignedPrompt });
+        io.to(p.id).emit('game_started', { prompt: assignedPrompt, duration: room.responseTimer });
     });
+
+    if (room.intervalHandle) clearInterval(room.intervalHandle);
+
+    room.intervalHandle = setInterval(() => {
+        if (room.state !== 'game') {
+            clearInterval(room.intervalHandle);
+            return;
+        }
+
+        if (!room.timerPaused) {
+            room.responseTimer--;
+            io.to(roomCode).emit('timer_tick', room.responseTimer);
+
+            if (room.responseTimer <= 0) {
+                clearInterval(room.intervalHandle);
+                room.state = 'discussion';
+                io.to(roomCode).emit('show_discussion', {
+                    innocentPrompt: room.currentPair.real,
+                    players: room.players.map(p => ({ id: p.id, name: p.name, icon: p.icon, answer: p.answer || '(No response)' }))
+                });
+            }
+        }
+    }, 1000);
 }
 
 function processRoundResults(roomCode) {
     const room = rooms[roomCode];
     room.state = 'scores';
+    if (room.intervalHandle) clearInterval(room.intervalHandle);
 
     const totalPlayers = room.players.length;
     const votesForImposter = room.players.filter(p => p.vote === room.imposterId).length;
